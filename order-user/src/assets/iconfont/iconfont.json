@@ -1,0 +1,107 @@
+{
+  "id": "5136929",
+  "name": "shop-user",
+  "font_family": "iconfont",
+  "css_prefix_text": "icon-",
+  "description": "",
+  "glyphs": [
+    {
+      "icon_id": "2155507",
+      "name": "删除",
+      "font_class": "shanchu",
+      "unicode": "e647",
+      "unicode_decimal": 58951
+    },
+    {
+      "icon_id": "1350116",
+      "name": "返回",
+      "font_class": "back",
+      "unicode": "e610",
+      "unicode_decimal": 58896
+    },
+    {
+      "icon_id": "2674476",
+      "name": "客服",
+      "font_class": "kefu",
+      "unicode": "e625",
+      "unicode_decimal": 58917
+    },
+    {
+      "icon_id": "3262855",
+      "name": "物流 小车车",
+      "font_class": "wuliuxiaocheche",
+      "unicode": "e620",
+      "unicode_decimal": 58912
+    },
+    {
+      "icon_id": "5388023",
+      "name": "包裹_o",
+      "font_class": "baoguo_o",
+      "unicode": "ebb9",
+      "unicode_decimal": 60345
+    },
+    {
+      "icon_id": "7579268",
+      "name": "货车",
+      "font_class": "huoche",
+      "unicode": "e990",
+      "unicode_decimal": 59792
+    },
+    {
+      "icon_id": "7677352",
+      "name": "运输中",
+      "font_class": "yunshuzhong",
+      "unicode": "e600",
+      "unicode_decimal": 58880
+    },
+    {
+      "icon_id": "9390426",
+      "name": "发送至",
+      "font_class": "fasongzhi",
+      "unicode": "e636",
+      "unicode_decimal": 58934
+    },
+    {
+      "icon_id": "10817076",
+      "name": "待取件",
+      "font_class": "qujianxinxi",
+      "unicode": "e8fb",
+      "unicode_decimal": 59643
+    },
+    {
+      "icon_id": "11445641",
+      "name": "发送至地图",
+      "font_class": "fasongzhiditu",
+      "unicode": "e61f",
+      "unicode_decimal": 58911
+    },
+    {
+      "icon_id": "15431883",
+      "name": "大货车",
+      "font_class": "dahuoche",
+      "unicode": "e693",
+      "unicode_decimal": 59027
+    },
+    {
+      "icon_id": "15816691",
+      "name": "001电动车",
+      "font_class": "001diandongche",
+      "unicode": "e829",
+      "unicode_decimal": 59433
+    },
+    {
+      "icon_id": "17868595",
+      "name": "搜索",
+      "font_class": "sousuo",
+      "unicode": "e60d",
+      "unicode_decimal": 58893
+    },
+    {
+      "icon_id": "34234447",
+      "name": "more-fill",
+      "font_class": "more-fill",
+      "unicode": "e759",
+      "unicode_decimal": 59225
+    }
+  ]
+}
