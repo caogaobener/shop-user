@@ -34,7 +34,7 @@
       <div class="card">
         <div class="status">运输中</div>
           <div class="position">山东省济南市 附近</div>
-          <div class="time">预计送达时间：11月21日</div>
+          <div class="time">预计送达时间：{{eta_time}}</div>
       </div>
       </div>
     </section>
@@ -45,22 +45,22 @@
         <div class="text">
           <div class="sender">
             <p>发货地</p>
-            <span>沈阳</span>
+            <span>{{order.express_info?.sender_address.match(/.+?(省|市|自治区)/)?.[0] || '起点'}}</span>
           </div>
           <div class="passed">
             <p style="font-weight: bold; font-size: 0.12rem;">
               已走
-              <span>20%</span>
+              <span>{{ progress }}%</span>
             </p>
-            <p>预计送达</p>
+            <p>预计{{ eta_time }}送达</p>
           </div>
           <div class="receiver">
             <p>收货地</p>
-            <span>北京</span>
+            <span>{{order.user_info?.address.match(/.+?(省|市|自治区)/)?.[0] || '终点'}}</span>
           </div>
         </div>
         <div class="line">
-          <div class="active" style="width: 20%;">
+          <div class="active" :style="{ width: progress + '%' }">
             <span
             class="iconfont icon-wuliuxiaocheche"
             ></span>
@@ -97,14 +97,14 @@
         <div class="user">
           <div class="dot"></div>
           <div class="right">
-            <p class="end">送至 长宁区</p>
+            <p class="end">送至 {{order.user_info?.address.match(/.+?(省|市|自治区)/)?.[0] || '终点'}}</p>
             <div class="desc">
               {{ receiver }}  {{ phone.replace(/(\d{3})\d{4}(\d{4})/, "$1****$2") }}
               <div class="protect">
                 号码保护中
               </div>
             </div>
-            <span>上海市长宁区某某小区</span>
+            <span>{{ order.user_info?.address }}</span>
           </div>
         </div>
       </div>
@@ -119,10 +119,16 @@ const route = useRoute()
 import request from '@/utils/request'
 import mapService from '@/utils/map'
 
+const order = ref({
+  express_info: { sender_address: '起点' },
+  user_info: { address: '终点' }
+})
+
 const phone = ref('')
 const receiver = ref('')
 const express = ref('')
 const express_no = ref('')
+const eta_time = ref('')
 
 const mapContainer = ref(null)
 const service = new mapService()
@@ -149,40 +155,53 @@ const frame = ref(0)
 const orderData = async () =>{
   try{
     const res = await request.get(`/orders/list/${route.params.id}`)
+    order.value = res
     return res
   }catch(error){
     console.error('获取起点终点出错',error,route.params.id)
     alert('获取起点终点出错!')
   }
 }
-// 获得运输信息
-const getExpressInfo = async () => {
-  try{
-    const res = await orderData() 
 
-    express_no.value = res.express_info.express_no
-    express.value = res.express_info.express_company
-    phone.value = res.user_info.phone
-    receiver.value = res.user_info.username
-    return {
-      express,
-      phone,
-      receiver
+// 获得运输信息
+const getExpressInfo = () => {
+  express_no.value = order.value.express_info.express_no
+  express.value = order.value.express_info.express_company
+  phone.value = order.value.user_info.phone
+  receiver.value = order.value.user_info.username
+  eta_time.value = order.value.eta_time
+  if(eta_time.value) {
+    eta_time.value = new Date(eta_time.value)
+    const month = eta_time.value.getMonth() + 1
+    const day = eta_time.value.getDate()
+    eta_time.value = `${month}月${day}日`
+  }
+}
+
+// 向后端传递距离
+const postDistance = async (distance) => {
+  try{
+    // 如果订单已经有距离了，就不再更新了，避免重复请求
+    if(order.value.distance && order.value.eta_time) {
+      return
     }
+    const result = await request.post(`/orders/list/${route.params.id}/distance`,{distance})
+    eta_time.value = new Date(result.eta_time)
+    const month = eta_time.value.getMonth() + 1
+    const day = eta_time.value.getDate()
+    eta_time.value = `${month}月${day}日`
   }catch(error){
-    console.error('获取运输信息出错',error,route.params.id)
-    alert('获取运输信息出错!')
+    console.error('更新距离出错',error,route.params.id)
+    alert('更新距离出错!')
   }
 }
 
 // 获得起点和终点坐标
  const getRoutePoints = async () => {
   try{
-    const res = await orderData() 
     // 描绘坐标点(对象形式)
-    const start = await service.geocode(res.express_info.sender_address)
-    const end = await service.geocode(res.user_info.address)
-    console.log('起点坐标',start,'终点坐标',end)
+    const start = await service.geocode(order.value.express_info.sender_address)
+    const end = await service.geocode(order.value.user_info.address)
     // 获得路径点数组（有效数据形式）
     const startArr = [start.lng,start.lat]
     const endArr = [end.lng,end.lat]
@@ -200,39 +219,68 @@ const getExpressInfo = async () => {
 
 // 小车移动动画
 const moveCar =() => {
-  frame.value++
-  // 每5帧移动一次，控制小车移动速度
-  if(frame.value % 5 !== 0) {
-    animationId.value = requestAnimationFrame(moveCar)
-    return
-  }
-
-  // 移动步长
-  const step = 1
-  currentIndex.value += step
-
-  // 走到终点
-  if(currentIndex.value >= totalPath.value.length) {
-    cancelAnimationFrame(animationId.value)
-    animationId.value = null
+  const now = Date.now()
+  
+  if (now >= order.value.eta_time) {
+    // 已到达预计时间
     progress.value = 100
-    passedDistance.value = totalDistance.value
-    return
+    currentIndex.value = totalPath.value.length - 1
+  } else {
+    // 计算时间进度
+    progress.value = (now - order.value.order_time) / (order.value.eta_time - order.value.order_time)
+    currentIndex.value = Math.floor(progress.value * (totalPath.value.length - 1))
   }
+  
   const currentPos = totalPath.value[currentIndex.value]
-  // 更新小车位置
   carMarker.value.setPosition(currentPos)
-
-  passedPath.value = totalPath.value.slice(0,currentIndex.value + 1)
+  
+  // 更新已走路径
+  passedPath.value = totalPath.value.slice(0, currentIndex.value + 1)
   passedLine.value.setPath(passedPath.value)
-  passedDistance.value =  service.AMap.GeometryUtil.distanceOfLine(passedPath.value)
-  // 进度条
-  progress.value = (passedDistance.value / totalDistance.value * 100).toFixed(2)
+  
+  // 更新进度条（现在基于时间而非距离）
+  progress.value = Math.round(progress.value * 100)
+  passedDistance.value = progress.value * totalDistance.value
+  
+  if (progress.value < 100) {
+    animationId.value = requestAnimationFrame(moveCar)
+  }
 
-  animationId.value = requestAnimationFrame(moveCar)
+  // frame.value++
+  // // 每10帧移动一次，控制小车移动速度
+  // if(frame.value % 10 !== 0) {
+  //   animationId.value = requestAnimationFrame(moveCar)
+  //   return
+  // }
+
+  // // 移动步长
+  // const step = 1
+  // currentIndex.value += step
+
+  // // 走到终点
+  // if(currentIndex.value >= totalPath.value.length) {
+  //   cancelAnimationFrame(animationId.value)
+  //   animationId.value = null
+  //   progress.value = 100
+  //   passedDistance.value = totalDistance.value
+  //   return
+  // }
+  // const currentPos = totalPath.value[currentIndex.value]
+  // // 更新小车位置
+  // carMarker.value.setPosition(currentPos)
+
+  // passedPath.value = totalPath.value.slice(0,currentIndex.value + 1)
+  // passedLine.value.setPath(passedPath.value)
+  // passedDistance.value =  service.AMap.GeometryUtil.distanceOfLine(passedPath.value)
+  // // 进度条
+  // progress.value =Math.round(passedDistance.value / totalDistance.value * 100)
+
+  // animationId.value = requestAnimationFrame(moveCar)
 }
 
 onMounted(async () => {
+  await orderData()
+
   await getExpressInfo()
   // 加载地图
   await service.loadMap(mapContainer.value)
@@ -241,8 +289,9 @@ onMounted(async () => {
   const {start,end} = await getRoutePoints()
   // 获得路径点数组以及总距离
   const{path,distance} = await service.drivingRoutes(start,end)
+  postDistance(distance)
   totalPath.value = path
-  totalDistance.value = distance
+  totalDistance.value = distance  
   // 拿到小车
   carMarker.value = service.createIcon(path[0])
   // 经过的路线

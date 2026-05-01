@@ -6,25 +6,13 @@ const baseService = require('../service/service')
 const router = express.Router()
 // 创建基础方法实例
 const service = new baseService(`orders`) 
-const {computeEta} = require('../service/eta')
+const computeEta = require('../service/eta')
 // 利用id查询订单
 router.get('/list/:id', async (req, res) => {
   try{
     const id = Number(req.params.id) 
     const order = await service.findById(id)
-    // 先查询订单是否存在以及是否有eta_time，如果有直接返回订单和eta_time
-    if (order.eta_time) {
-      return res.json({
-        code:0,
-        msg:'获取当前订单成功',
-        data:{
-          order,
-          eta_time: order.eta_time
-        }
-      })
-    }
-    // // 计算ETA
-    // const eta = computeEta(order.express_info.sender_address, order.user_info.address, order.distance, order.order_time)
+
     if(!order){
       return res.json({
         code:1,
@@ -35,9 +23,7 @@ router.get('/list/:id', async (req, res) => {
       res.json({
         code:0,
         msg:'获取当前订单成功',
-        data:{
-          order
-        }
+        data:order
       })
     }
 
@@ -45,15 +31,51 @@ router.get('/list/:id', async (req, res) => {
     console.log('❌ 路线接口报错：', err)
     res.json({
       code:1,
-      msg:'获取路线失败',
+      msg:'获取订单失败',
       data:null
     })
   }
 })  
  
 // 前端传递distance
+router.post('/list/:id/distance', async (req, res) => {
+    const { distance } = req.body
+    const id = Number(req.params.id) 
+    try {
+      const order = await service.findById(id)
+      // 更新 distance
+      await pool.execute('UPDATE orders SET distance = ? WHERE id = ?', [distance, id])
+  
+      let etaTime = null;
+      etaTime = computeEta(
+        order.express_info.sender_address,
+        order.user_info.address,
+        distance,
+        order.order_time
+      )
+      // 更新 eta_time
+      await pool.execute('UPDATE orders SET eta_time = ? WHERE id = ?', [etaTime, id]);
+  
+      res.json({ 
+        code: 0,
+        msg: '距离和ETA时间更新成功',
+        data: {
+          distance,
+          eta_time: etaTime  // 如果 shipped_at 为空，这里也是 null
+        }
+      })
+  
+    } catch (err) {
+      console.error(err.message)
+      res.json({ 
+        code:1,
+        msg:err.message,
+        data:null
+      })
+    }
+})
 
-// 获取订单
+// 获取订单列表
 router.get('/list', async (req, res) => {
   try{
     const rows = await service.findAll()
