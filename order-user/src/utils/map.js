@@ -85,11 +85,11 @@ class mapService {
           // 途经城市
           const cities = new Set(result.routes[0].steps.map(item=>item.cities).flat().map(city=>city?.name))
           cities.delete(undefined)
-          console.log('途经城市：', cities)
           this.extractTransition(cities)
           resolve({
             path:path,
             distance: result.routes[0].distance,
+            duration: result.routes[0].time,
             cities:cities
             })
         }else{

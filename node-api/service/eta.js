@@ -14,7 +14,7 @@ function getProvince(address) {
 */
 function computeEta(senderAddress, receiverAddress, distance, orderTime, duration){
   // 初始化时间
-  const totaltime = shipTime ? new Date(shipTime) : new Date()
+  const totaltime = orderTime ? new Date(orderTime) : new Date()
 
   let transportHours = 0
   

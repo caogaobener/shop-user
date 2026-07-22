@@ -149,7 +149,7 @@ const animationId = ref(null)
 const carMarker = ref(null)
 
 // 节流
-const frame = ref(0)
+// const frame = ref(0)
 
 // 封装当前订单数据
 const orderData = async () =>{
@@ -178,14 +178,14 @@ const getExpressInfo = () => {
   }
 }
 
-// 向后端传递距离
-const postDistance = async (distance) => {
+// 向后端传递距离以及驾车时间，计算eta
+const postParams = async (distance,duration) => {
   try{
     // 如果订单已经有距离了，就不再更新了，避免重复请求
     if(order.value.distance && order.value.eta_time) {
       return
     }
-    const result = await request.post(`/orders/list/${route.params.id}/distance`,{distance})
+    const result = await request.post(`/orders/list/${route.params.id}/eta`,{distance,duration})
     eta_time.value = new Date(result.eta_time)
     const month = eta_time.value.getMonth() + 1
     const day = eta_time.value.getDate()
@@ -217,65 +217,112 @@ const postDistance = async (distance) => {
 
 }
 
-// 小车移动动画
-const moveCar =() => {
-  const now = Date.now()
+// // 小车移动动画
+// const moveCar =() => {
+//   const now = Date.now()
   
-  if (now >= order.value.eta_time) {
-    // 已到达预计时间
+//   if (now >= order.value.eta_time) {
+//     console.log('时间字段校验', {
+//     order_time: order.value.order_time,
+//     eta_time: order.value.eta_time,
+//     order_time_type: typeof order.value.order_time,
+//     eta_time_type: typeof order.value.eta_time
+//   })
+//     // 已到达预计时间
+//     progress.value = 100
+//     currentIndex.value = totalPath.value.length - 1
+//   } else {
+//     // 计算时间进度
+//     progress.value = (now - order.value.order_time) / (order.value.eta_time - order.value.order_time)
+//     currentIndex.value = Math.floor(progress.value * (totalPath.value.length - 1))
+//   }
+  
+//   const currentPos = totalPath.value[currentIndex.value]
+//   carMarker.value.setPosition(currentPos)
+  
+//   // 更新已走路径
+//   passedPath.value = totalPath.value.slice(0, currentIndex.value + 1)
+//   passedLine.value.setPath(passedPath.value)
+  
+//   // 更新进度条（现在基于时间而非距离）
+//   progress.value = Math.round(progress.value * 100)
+//   passedDistance.value = progress.value * totalDistance.value
+  
+//   if (progress.value < 100) {
+//     animationId.value = requestAnimationFrame(moveCar)
+//   }
+
+//   // frame.value++
+//   // // 每10帧移动一次，控制小车移动速度
+//   // if(frame.value % 10 !== 0) {
+//   //   animationId.value = requestAnimationFrame(moveCar)
+//   //   return
+//   // }
+
+//   // // 移动步长
+//   // const step = 1
+//   // currentIndex.value += step
+
+//   // // 走到终点
+//   // if(currentIndex.value >= totalPath.value.length) {
+//   //   cancelAnimationFrame(animationId.value)
+//   //   animationId.value = null
+//   //   progress.value = 100
+//   //   passedDistance.value = totalDistance.value
+//   //   return
+//   // }
+//   // const currentPos = totalPath.value[currentIndex.value]
+//   // // 更新小车位置
+//   // carMarker.value.setPosition(currentPos)
+
+//   // passedPath.value = totalPath.value.slice(0,currentIndex.value + 1)
+//   // passedLine.value.setPath(passedPath.value)
+//   // passedDistance.value =  service.AMap.GeometryUtil.distanceOfLine(passedPath.value)
+//   // // 进度条
+//   // progress.value =Math.round(passedDistance.value / totalDistance.value * 100)
+
+//   // animationId.value = requestAnimationFrame(moveCar)
+// }
+
+const moveCar = () => {
+  const now = Date.now()
+  // 统一转成数字时间戳，兼容字符串、Date对象、时间戳
+  const orderTime = new Date(order.value.order_time).getTime()
+  const etaTime = new Date(order.value.eta_time).getTime()
+
+  // 兜底判断：时间非法 / 时间顺序反了 / 已送达，都直接设为100%
+  if (isNaN(orderTime) || isNaN(etaTime) || now >= etaTime || orderTime >= etaTime) {
     progress.value = 100
     currentIndex.value = totalPath.value.length - 1
   } else {
-    // 计算时间进度
-    progress.value = (now - order.value.order_time) / (order.value.eta_time - order.value.order_time)
+    // 正常计算时间进度
+    progress.value = (now - orderTime) / (etaTime - orderTime)
     currentIndex.value = Math.floor(progress.value * (totalPath.value.length - 1))
   }
+
+  // 索引强制兜底，防止越界
+  currentIndex.value = Math.max(0, Math.min(currentIndex.value, totalPath.value.length - 1))
   
+  // 更新小车位置
   const currentPos = totalPath.value[currentIndex.value]
-  carMarker.value.setPosition(currentPos)
-  
-  // 更新已走路径
+  if (carMarker.value && currentPos) {
+    carMarker.value.setPosition(currentPos)
+  }
+
+  // 更新已走路径（至少2个点才更新，避免空数组触发Polyline报错）
   passedPath.value = totalPath.value.slice(0, currentIndex.value + 1)
-  passedLine.value.setPath(passedPath.value)
-  
-  // 更新进度条（现在基于时间而非距离）
-  progress.value = Math.round(progress.value * 100)
-  passedDistance.value = progress.value * totalDistance.value
-  
+  if (passedLine.value && passedPath.value.length >= 2) {
+    passedLine.value.setPath(passedPath.value)
+  }
+
+  // 进度百分比（强制限制在0-100）
+  progress.value = Math.round(Math.max(0, Math.min(1, progress.value)) * 100)
+  passedDistance.value = (progress.value / 100) * totalDistance.value
+
+  // 没到终点就继续动画
   if (progress.value < 100) {
     animationId.value = requestAnimationFrame(moveCar)
   }
-
-  // frame.value++
-  // // 每10帧移动一次，控制小车移动速度
-  // if(frame.value % 10 !== 0) {
-  //   animationId.value = requestAnimationFrame(moveCar)
-  //   return
-  // }
-
-  // // 移动步长
-  // const step = 1
-  // currentIndex.value += step
-
-  // // 走到终点
-  // if(currentIndex.value >= totalPath.value.length) {
-  //   cancelAnimationFrame(animationId.value)
-  //   animationId.value = null
-  //   progress.value = 100
-  //   passedDistance.value = totalDistance.value
-  //   return
-  // }
-  // const currentPos = totalPath.value[currentIndex.value]
-  // // 更新小车位置
-  // carMarker.value.setPosition(currentPos)
-
-  // passedPath.value = totalPath.value.slice(0,currentIndex.value + 1)
-  // passedLine.value.setPath(passedPath.value)
-  // passedDistance.value =  service.AMap.GeometryUtil.distanceOfLine(passedPath.value)
-  // // 进度条
-  // progress.value =Math.round(passedDistance.value / totalDistance.value * 100)
-
-  // animationId.value = requestAnimationFrame(moveCar)
 }
 
 onMounted(async () => {
@@ -288,8 +335,8 @@ onMounted(async () => {
   // 获得起点和终点坐标
   const {start,end} = await getRoutePoints()
   // 获得路径点数组以及总距离
-  const{path,distance} = await service.drivingRoutes(start,end)
-  postDistance(distance)
+  const{path,distance,duration} = await service.drivingRoutes(start,end)
+  postParams(distance,duration)
   totalPath.value = path
   totalDistance.value = distance  
   // 拿到小车

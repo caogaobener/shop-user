@@ -37,9 +37,10 @@ router.get('/list/:id', async (req, res) => {
   }
 })  
  
-// 前端传递distance
-router.post('/list/:id/distance', async (req, res) => {
-    const { distance } = req.body
+// 前端传递distance和duration
+router.post('/list/:id/eta', async (req, res) => {
+  console.log('收到前端距离和时间：', req.body)
+    const { distance,duration} = req.body
     const id = Number(req.params.id) 
     try {
       const order = await service.findById(id)
@@ -51,11 +52,13 @@ router.post('/list/:id/distance', async (req, res) => {
         order.express_info.sender_address,
         order.user_info.address,
         distance,
-        order.order_time
+        order.order_time,
+        duration
       )
       // 更新 eta_time
       await pool.execute('UPDATE orders SET eta_time = ? WHERE id = ?', [etaTime, id]);
-  
+      console.log('eta',etaTime)
+      
       res.json({ 
         code: 0,
         msg: '距离和ETA时间更新成功',
