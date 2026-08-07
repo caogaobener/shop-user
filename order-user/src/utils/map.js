@@ -1,4 +1,5 @@
 import AMapLoader from '@amap/amap-jsapi-loader' 
+import { showToast  } from 'vant'
 
 // 唯一保留的安全配置
 window._AMapSecurityConfig = {
@@ -13,6 +14,11 @@ class mapService {
     this.map = null,
     this.version = '2.0'
     this.key = '349ca9dae320fbae98f6c408631b7553'
+
+    this.fullPath = []
+    this.fullLine = null
+    this.passedLine = null 
+    this.carMarker = null
   }
 
   // 加载地图
@@ -32,7 +38,7 @@ class mapService {
     })
    }catch(err){
     console.log('❌ 地图加载失败：', err)
-    alert('地图加载失败，请稍后再试')
+    showToast('地图加载失败，请稍后再试')
    }
   }
 
@@ -85,12 +91,12 @@ class mapService {
           // 途经城市
           const cities = new Set(result.routes[0].steps.map(item=>item.cities).flat().map(city=>city?.name))
           cities.delete(undefined)
-          this.extractTransition(cities)
+          const filteredCities  = this.extractTransition(Array.from(cities))
           resolve({
             path:path,
             distance: result.routes[0].distance,
             duration: result.routes[0].time,
-            cities:cities
+            cities:filteredCities
             })
         }else{
             const errMsg = result?.info || '未知错误'
@@ -102,7 +108,7 @@ class mapService {
   }
 
   // 伪中转站
-  async extractTransition(cities){
+  extractTransition(cities){
     // 核心中转站
     const cityset = new Set([
       '北京市', '上海市', '广州市', '武汉市', '成都市', '西安市', '郑州市', '南京市', '杭州市',
@@ -120,34 +126,53 @@ class mapService {
     ])
     // 先去除起点和终点城市，再筛选核心中转站，最后控制中转站数量不超过3个
     if(cities.length <= 3) return cities 
-    const transitionCities = Array.from(cities).slice(1,-1).filter(city => cityset.has(city))
-    return transitionCities
+    let transitionCities = cities.slice(1,-1).filter(city => cityset.has(city))
+    if(transitionCities.length > 3)transitionCities = transitionCities.slice(0,3)
+    return [cities[0], ...transitionCities, cities[cities.length - 1]]
   }
 
   // 绘制路线
-  async drawRoutes(start ,end ){
-    const {path} = await this.drivingRoutes(start,end)
+  async drawRoutes(path ){
+    if(!path || path.length === 0) return
+
+    this.fullPath = path
     // 完整路线
-    const fullLine = new this.AMap.Polyline({
+    this.fullLine = new this.AMap.Polyline({
       path:path,
       strokeColor: "#FFD591",
       strokeWeight: 6,
       strokeOpacity: 1,
       zIndex: 100
     })
-    const passedLine = new this.AMap.Polyline({
+    this.passedLine = new this.AMap.Polyline({
       path:[],
       strokeColor: "#FF4D4F",
       strokeWeight: 6,
       strokeOpacity: 1,
       zIndex: 101
     })
+    this.carMarker = this.createIcon(path[0])
 
-    this.map.add([fullLine, passedLine])
-    this.map.setFitView([fullLine, passedLine])
-    return {
-      full: fullLine,
-      passed: passedLine
+    this.map.add([this.fullLine, this.passedLine , this.carMarker])
+    this.map.setFitView([this.fullLine, this.passedLine])
+  }
+
+  // 计算进度
+  updateProgress(ratio){
+    if(!this.fullPath || ratio < 0 || ratio > 1) return
+    const maxIndex = this.fullPath.length - 1
+    const index = Math.floor(ratio * maxIndex)
+
+    const currentPos = this.fullPath[index]
+
+    // 定位小车图标
+    if(this.carMarker && currentPos){
+      this.carMarker.setPosition(currentPos)
+    }
+    // 更新已行驶路线
+    const passedPath = this.fullPath.slice(0, index + 1)
+    if(this.passedLine){
+      this.passedLine.setPath(passedPath)
     }
   }
 
@@ -173,23 +198,30 @@ class mapService {
       </div>
       `,
     })
-    this.map.add(marker)
-    // this.map.setFitView(marker)
     return marker
    }
-
-  //  视野自适应
-  setFitView(layer){
-    this.map.setFitView(layer)
-  }
 
   //  销毁实例
   destroy(){
     if (this.map) {
+      // 移除地图实例
+      if (this.fullLine) this.map.remove([this.fullLine])
+      if (this.passedLine) this.map.remove([this.passedLine])
+      if (this.carMarker) this.map.remove([this.carMarker])
+
+      // 销毁地图实例
       this.map.destroy()
+
       this.map = null
       this.AMap = null
+
+      // 清除内部变量
+      this.fullPath = []
+      this.fullLine = null
+      this.passedLine = null 
+      this.carMarker = null
     }
+
   }
 }
 

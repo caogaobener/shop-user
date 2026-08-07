@@ -12,7 +12,7 @@
         </button>   
       </div>
       <!-- 搜索框 -->
-      <div class="search-wrap" @click="openSearch">
+      <div class="search-wrap" @click.stop="openSearch">
         <span class="iconfont icon-sousuo"></span>
         <input 
         type="text" 
@@ -22,7 +22,7 @@
         >
         <button 
         v-if="!isOrderPage"
-        @click="search"
+        @click.stop="search"
         >搜索</button>
       </div>
       
@@ -95,7 +95,7 @@ import { useRoute, useRouter } from 'vue-router';
 import request from '../utils/request'
 
 import 'vant/lib/index.css'; 
-import { showConfirmDialog } from 'vant'
+import { showConfirmDialog , showToast  } from 'vant'
 const route = useRoute()
 const router = useRouter()
 
@@ -128,20 +128,29 @@ const tabChange = (newVal) => {
 }
 // 打开搜索页面
 const openSearch = () => {
-  if(props.isOrderPage) {
-    emit('openSearch')
-    console.log('打开搜索页面')
-  } 
+  router.push('/order/all?search=1') 
 }
 const goSearch = (words)=>{
   router.push(`/searchIndex/${words}`)
 }
 
+const isSearching = ref(false)
+
 // 点击搜索或回车搜索
 const search = ()=>{
+  if(isSearching.value) return // 防止重复点击
   console.log('搜索关键词',searchValue.value)
+  if (!searchValue.value.trim()) {
+    // 空搜索提示
+    showToast('请输入搜索关键词')
+    return
+  }
+  isSearching.value = true
   goSearch(searchValue.value)
   addHistory(searchValue.value)
+  setTimeout(() => {
+    isSearching.value = false
+  }, 500)
 }
 
 // 回退
@@ -153,10 +162,9 @@ const goBack = () => {
     // 0.3s后，input清空
     setTimeout(() => {
       searchValue.value = ''
-    }, 300);
-  }else  if(props.isSearchIndex){
+    }, 300)
     router.push('/order/all')
-  }else {
+  }else{
     router.back()
   } 
 }
@@ -166,33 +174,27 @@ const historyList = ref([])
 const getHistory = async () => {
   try{
     const res = await request.get('/history/list')
-    console.log('历史记录',res)
-    historyList.value = res.map(item => item.value).reverse()// 倒序显示
+    historyList.value = res.map(item => item.value).reverse()// 反转数组，最新的记录在最前面
   }catch(error){
     console.error('获取历史记录失败:', error);
   }
 }
 
-// 新增历史记录+跳转搜索
+// 新增历史记录+跳转搜索？
 const addHistory = async (searchValue)=>{
   try{
     // 非空搜索+判断历史记录是否重复
     if(!searchValue.trim() || historyList.value.includes(searchValue.trim())) return
+    // 乐观更新UI，再请求接口添加到数据库
+    historyList.value = [searchValue.trim(), ...historyList.value]// 添加到数组首位
     await request.post('/history/add',{value: searchValue.trim()})
-
-    await getHistory()
-    goSearch(searchValue.trim())
-    console.log(`新增历史记录${searchValue.trim()}成功`)
   }catch(error){
     console.error('新增历史记录失败:', error)
   }
 }
 // 历史记录回显
-const echoValue = ref('')
-
 const clickEcho = (item) => {
-  echoValue.value = item.trim()
-  goSearch(echoValue.value)
+  goSearch(item.trim())
 }
 
 // 弹窗+删除历史记录
@@ -204,12 +206,16 @@ const popUp = () => {
     confirmButtonColor:"#ff5000",
     beforeClose: async (action)=>{
       if(action === 'confirm'){
+        const back = [...historyList.value]
         try{
+          historyList.value = []// 清空数组
           await request.delete('/history/delete')
-          await getHistory()
+          showToast('删除成功')
           return true// 关闭弹窗
         }catch(error){
-          alert('删除失败', error.message || '未知错误')
+          historyList.value = back// 失败回滚
+          showToast('删除失败，请检查网络后重试')
+          console.error('删除历史记录失败:', error)
           return false//关闭弹窗出错
         }
       }else{

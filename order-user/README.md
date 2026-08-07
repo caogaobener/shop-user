@@ -1,44 +1,36 @@
-# order-user
+# 抖音电商风格订单管理平台（Vue 3 实战项目）
 
-This template should help get you started developing with Vue 3 in Vite.
+基于 Vue 3 + Vant + 高德地图 API 构建的移动端电商订单管理应用，模拟抖音商城订单查看、物流追踪与历史搜索功能。
 
-## Recommended IDE Setup
+## 项目核心亮点
 
-[VS Code](https://code.visualstudio.com/) + [Vue (Official)](https://marketplace.visualstudio.com/items?itemName=Vue.volar) (and disable Vetur).
+- **可视化物流追踪**：集成高德地图 SDK，实现订单物流轨迹动画与“小车”路径平滑移动。
+- **订单状态筛选**：支持全部/待付款/待发货/待收货/退款售后多维度 Tab 切换。
+- **智能搜索系统**：
+  - 覆盖层（Overlay）滑出式搜索入口，监听路由变化改变路由内容，保留订单列表滚动状态。
+  - 历史记录采用 **乐观更新（Optimistic Update）** 策略，新增/删除即时响应，并采用失败回滚保证数据一致性。
+  - URL Query 参数（`?search=1`）驱动覆盖层显示，支持页面刷新状态保留。
+- **性能体验优化**：
+  - 图片原生懒加载（`loading="lazy"`）与加载失败兜底。
+  - 列表骨架屏（Skeleton Screen）占位，闪光高亮效果，有效降低 CLS（累积布局偏移）指标。
+  - 搜索防抖控制，避免高频无效请求。
 
-## Recommended Browser Setup
+## 🛠 技术栈
 
-- Chromium-based browsers (Chrome, Edge, Brave, etc.):
-  - [Vue.js devtools](https://chromewebstore.google.com/detail/vuejs-devtools/nhdogjmejiglipccpnnnanhbledajbpd)
-  - [Turn on Custom Object Formatter in Chrome DevTools](http://bit.ly/object-formatters)
-- Firefox:
-  - [Vue.js devtools](https://addons.mozilla.org/en-US/firefox/addon/vue-js-devtools/)
-  - [Turn on Custom Object Formatter in Firefox DevTools](https://fxdx.dev/firefox-devtools-custom-object-formatters/)
+- **前端框架**：Vue 3 (Composition API) + Vue Router
+- **UI 组件库**：Vant 4 (移动端)
+- **地图服务**：高德地图 JS API 2.0
+- **构建工具**：Vite
+- **HTTP 请求**：Axios
 
-## Customize configuration
+## 🚀 快速启动
 
-See [Vite Configuration Reference](https://vite.dev/config/).
-
-## Project Setup
-
-```sh
+```bash
+# 1. 安装依赖
 npm install
-```
 
-### Compile and Hot-Reload for Development
-
-```sh
+# 2. 启动开发服务器（热更新）
 npm run dev
-```
 
-### Compile and Minify for Production
-
-```sh
+# 3. 构建生产包
 npm run build
-```
-
-### Lint with [ESLint](https://eslint.org/)
-
-```sh
-npm run lint
-```

@@ -32,8 +32,8 @@
 
       <!-- 右下卡片 -->
       <div class="card">
-        <div class="status">运输中</div>
-          <div class="position">山东省济南市 附近</div>
+        <div class="status">{{currentCarData.status}}</div>
+          <div class="position">{{`当前城市: ${currentCarData.city}` }} </div>
           <div class="time">预计送达时间：{{eta_time}}</div>
       </div>
       </div>
@@ -80,19 +80,26 @@
         </div>
       </div>
       <div class="info">
-        <div class="route">
+        <div 
+        class="route"
+        v-for="(item, index) in carData"
+        :key="index"
+        :class = "{
+          'hidden-item': !isExpand && index !== currentIndex
+        }"
+        >
           <div class="dot"></div>
           <div class="right">
             <div class="title">
-              <p>运输中</p>
-              <span>11-18</span>
+              <p>{{ item.status }}</p>
+              <span>{{ item.time }}</span>
             </div>
-            <p>快件已离开【沈阳】,下一站【北京】</p>
+            <p>{{ item.desc }}</p>
           </div>      
         </div>
-        <div class="more">
+        <div class="more" @click="isExpand = !isExpand">
             <div class="dot"></div>
-            <p>查看更多物流明细</p>
+            <p>{{ isExpand ? '收起物流明细' : '查看更多物流明细' }}</p>
           </div>
         <div class="user">
           <div class="dot"></div>
@@ -113,16 +120,20 @@
 </template>
 
 <script setup >
-import { onMounted,ref,onUnmounted } from 'vue'
+import { onMounted,ref,onUnmounted,computed } from 'vue'
 import { useRoute } from 'vue-router'
 const route = useRoute()
 import request from '@/utils/request'
 import mapService from '@/utils/map'
+import { showToast } from 'vant'
 
 const order = ref({
   express_info: { sender_address: '起点' },
   user_info: { address: '终点' }
 })
+// 统一转成数字时间戳，兼容字符串、Date对象、时间戳
+const orderTime = ref(0)
+const etaTime = ref(0)
 
 const phone = ref('')
 const receiver = ref('')
@@ -133,33 +144,25 @@ const eta_time = ref('')
 const mapContainer = ref(null)
 const service = new mapService()
 
-const currentIndex = ref(0)
-const totalPath = ref([])
-const totalDistance = ref(0)
-const fullLine = ref(null)
-
-const passedPath = ref([])
-const passedDistance = ref(0)
-const passedLine = ref(null)
-
 const progress = ref(0)
 
 const animationId = ref(null)
 
-const carMarker = ref(null)
-
-// 节流
-// const frame = ref(0)
+const trackCities = ref([])
+const currentIndex = ref(0)
+const isExpand = ref(false)
 
 // 封装当前订单数据
 const orderData = async () =>{
   try{
     const res = await request.get(`/orders/list/${route.params.id}`)
     order.value = res
+    orderTime.value = new Date(order.value.order_time).getTime()
+  etaTime.value = new Date(order.value.eta_time).getTime()
     return res
   }catch(error){
+    showToast('获取起点终点出错!')
     console.error('获取起点终点出错',error,route.params.id)
-    alert('获取起点终点出错!')
   }
 }
 
@@ -192,7 +195,7 @@ const postParams = async (distance,duration) => {
     eta_time.value = `${month}月${day}日`
   }catch(error){
     console.error('更新距离出错',error,route.params.id)
-    alert('更新距离出错!')
+    showToast('更新距离出错!')
   }
 }
 
@@ -217,117 +220,111 @@ const postParams = async (distance,duration) => {
 
 }
 
-// // 小车移动动画
-// const moveCar =() => {
-//   const now = Date.now()
-  
-//   if (now >= order.value.eta_time) {
-//     console.log('时间字段校验', {
-//     order_time: order.value.order_time,
-//     eta_time: order.value.eta_time,
-//     order_time_type: typeof order.value.order_time,
-//     eta_time_type: typeof order.value.eta_time
-//   })
-//     // 已到达预计时间
-//     progress.value = 100
-//     currentIndex.value = totalPath.value.length - 1
-//   } else {
-//     // 计算时间进度
-//     progress.value = (now - order.value.order_time) / (order.value.eta_time - order.value.order_time)
-//     currentIndex.value = Math.floor(progress.value * (totalPath.value.length - 1))
-//   }
-  
-//   const currentPos = totalPath.value[currentIndex.value]
-//   carMarker.value.setPosition(currentPos)
-  
-//   // 更新已走路径
-//   passedPath.value = totalPath.value.slice(0, currentIndex.value + 1)
-//   passedLine.value.setPath(passedPath.value)
-  
-//   // 更新进度条（现在基于时间而非距离）
-//   progress.value = Math.round(progress.value * 100)
-//   passedDistance.value = progress.value * totalDistance.value
-  
-//   if (progress.value < 100) {
-//     animationId.value = requestAnimationFrame(moveCar)
-//   }
-
-//   // frame.value++
-//   // // 每10帧移动一次，控制小车移动速度
-//   // if(frame.value % 10 !== 0) {
-//   //   animationId.value = requestAnimationFrame(moveCar)
-//   //   return
-//   // }
-
-//   // // 移动步长
-//   // const step = 1
-//   // currentIndex.value += step
-
-//   // // 走到终点
-//   // if(currentIndex.value >= totalPath.value.length) {
-//   //   cancelAnimationFrame(animationId.value)
-//   //   animationId.value = null
-//   //   progress.value = 100
-//   //   passedDistance.value = totalDistance.value
-//   //   return
-//   // }
-//   // const currentPos = totalPath.value[currentIndex.value]
-//   // // 更新小车位置
-//   // carMarker.value.setPosition(currentPos)
-
-//   // passedPath.value = totalPath.value.slice(0,currentIndex.value + 1)
-//   // passedLine.value.setPath(passedPath.value)
-//   // passedDistance.value =  service.AMap.GeometryUtil.distanceOfLine(passedPath.value)
-//   // // 进度条
-//   // progress.value =Math.round(passedDistance.value / totalDistance.value * 100)
-
-//   // animationId.value = requestAnimationFrame(moveCar)
-// }
-
+// 小车运动函数
 const moveCar = () => {
   const now = Date.now()
-  // 统一转成数字时间戳，兼容字符串、Date对象、时间戳
-  const orderTime = new Date(order.value.order_time).getTime()
-  const etaTime = new Date(order.value.eta_time).getTime()
 
+  let ratio = 0
   // 兜底判断：时间非法 / 时间顺序反了 / 已送达，都直接设为100%
-  if (isNaN(orderTime) || isNaN(etaTime) || now >= etaTime || orderTime >= etaTime) {
-    progress.value = 100
-    currentIndex.value = totalPath.value.length - 1
+  if (isNaN(orderTime.value) || isNaN(etaTime.value) || now >= etaTime.value || orderTime.value >= etaTime.value) {
+    ratio = 1
   } else {
     // 正常计算时间进度
-    progress.value = (now - orderTime) / (etaTime - orderTime)
-    currentIndex.value = Math.floor(progress.value * (totalPath.value.length - 1))
+    ratio = (now - orderTime.value) / (etaTime.value - orderTime.value)
+    ratio = Math.max(0 , Math.min(1, ratio))
+
   }
 
-  // 索引强制兜底，防止越界
-  currentIndex.value = Math.max(0, Math.min(currentIndex.value, totalPath.value.length - 1))
-  
-  // 更新小车位置
-  const currentPos = totalPath.value[currentIndex.value]
-  if (carMarker.value && currentPos) {
-    carMarker.value.setPosition(currentPos)
-  }
+  progress.value =  Math.round(ratio * 100)
 
-  // 更新已走路径（至少2个点才更新，避免空数组触发Polyline报错）
-  passedPath.value = totalPath.value.slice(0, currentIndex.value + 1)
-  if (passedLine.value && passedPath.value.length >= 2) {
-    passedLine.value.setPath(passedPath.value)
-  }
-
-  // 进度百分比（强制限制在0-100）
-  progress.value = Math.round(Math.max(0, Math.min(1, progress.value)) * 100)
-  passedDistance.value = (progress.value / 100) * totalDistance.value
-
-  // 没到终点就继续动画
-  if (progress.value < 100) {
+  service.updateProgress(ratio)
+  // 计算当前城市索引
+  currentIndex.value = Math.round((1 - ratio) * (trackCities.value.length - 1))
+  // 没到终点且页面显示就继续动画
+  if (progress.value < 100 && !document.hidden) {
     animationId.value = requestAnimationFrame(moveCar)
+  }else{
+    animationId.value = null
+  }
+}
+
+// 物流卡片
+const carData = computed(()=>{
+  // 占位，便于cardata计算更新
+  const p = progress.value
+  
+  const now = Date.now()
+  const isDelivered = (now >= etaTime.value || orderTime.value >= etaTime.value)
+  let timeStr = ''
+  return trackCities.value.map((city, index) => {
+    // 计算每个节点的时间
+    if (!isNaN(orderTime.value) && !isNaN(etaTime.value) && now <= etaTime.value ) {
+      const ratio = 1 - index/(trackCities.value.length - 1)
+      const nodeTime =new Date(orderTime.value + ratio * (etaTime.value - orderTime.value))
+      timeStr = `${nodeTime.getMonth() + 1}-${String(nodeTime.getDate()).padStart(2, '0')}`
+    } 
+
+    let status = '运输中'
+    let desc = ''
+    if(isDelivered && index === 0){
+      status = '已送达'
+      desc = `快件已送达【${city}】`
+    }else if(index === 0){
+      status = '运输中'
+      desc = `快件已到达【${city}】，预计今日送达`
+    }else if(index === trackCities.value.length - 1){
+      status = '运输中'
+      desc = `快件已从【${city}】发出`
+    }else{
+      status = '运输中'
+      desc = `快件已到达【${city}】中转站，下一站【${trackCities.value[index - 1]}】`
+    }
+    return {
+      city,
+      status,
+      desc,
+      time: timeStr
+    }
+  })
+})
+
+// 当前物流卡片
+const currentCarData = computed(()=>{
+  // 兜底判断，防止数组为空时出错
+  if (!carData.value || carData.value.length === 0) {
+    return { status: '运输中', city: '附近' }
+  }
+    return {
+      status: carData.value[currentIndex.value].status,
+      city: carData.value[currentIndex.value].city
+    }
+})
+
+const isPageVisible = ref(true)
+// 监听页面可见性变化，节省性能，不可见时停止动画，可见时恢复
+const handleVisibilityChange = () => {
+  // 页面隐藏停止动画
+  if(document.hidden){
+    isPageVisible.value = false
+    if(animationId.value){
+      cancelAnimationFrame(animationId.value)
+      animationId.value = null
+    }
+
+  }else{
+    isPageVisible.value = true
+
+    if(progress.value < 100){
+      moveCar()
+    }
   }
 }
 
 onMounted(async () => {
+  // 监听页面切换，切换时执行函数判断动画是否暂停
+  document.addEventListener('visibilitychange', handleVisibilityChange)
+ 
   await orderData()
-
   await getExpressInfo()
   // 加载地图
   await service.loadMap(mapContainer.value)
@@ -335,22 +332,18 @@ onMounted(async () => {
   // 获得起点和终点坐标
   const {start,end} = await getRoutePoints()
   // 获得路径点数组以及总距离
-  const{path,distance,duration} = await service.drivingRoutes(start,end)
-  postParams(distance,duration)
-  totalPath.value = path
-  totalDistance.value = distance  
-  // 拿到小车
-  carMarker.value = service.createIcon(path[0])
+  const{path,distance,duration,cities} = await service.drivingRoutes(start,end)
+  await postParams(distance,duration)
+  trackCities.value = cities.reverse()
+
   // 经过的路线
-  const {full, passed} = await service.drawRoutes(start ,end )
-  fullLine.value = full
-  passedLine.value = passed
+  await service.drawRoutes(path)
 
   moveCar()
-
 })
 
 onUnmounted(() => {
+  document.removeEventListener('visibilitychange', handleVisibilityChange)
   service.destroy()
   cancelAnimationFrame(animationId.value)
 })
@@ -578,6 +571,9 @@ onUnmounted(() => {
       font-size: 0.12rem;
       font-weight: normal;
     }
+    &.hidden-item {
+      display: none;
+    }
   }
   .more {
     display: flex;
@@ -626,5 +622,7 @@ onUnmounted(() => {
       color: #888;
     }
   }
+
+  
 } 
 </style>

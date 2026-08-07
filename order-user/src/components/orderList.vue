@@ -1,6 +1,12 @@
 <template>
   <div class="order-list">
+    <!-- 骨架加载 -->
+    <div v-if="!orderList.length && loading" >
+      <div v-for="n in 3" :key="n" class="skeleton-item"></div>
+    </div>
+
     <div 
+    v-else-if="filteredOrder.length > 0"
     class="order"
     v-for="(item, index) in filteredOrder"
     :key="index"
@@ -19,7 +25,13 @@
         <div class="item_info">
           <div class="img">
             <img
-              :src="item.img "
+              loading="lazy"
+              :src="item.img || '/uploads/default.png' "
+              @error="(e)=>{
+                e.target.src = '/uploads/default.png'
+              }"
+              alt="商品图片"
+
             />
           </div>
           <div class="info">
@@ -42,7 +54,7 @@
         <div class="recieve"></div>
         <div class="price">
           <span>实付</span>
-          <p>￥{{(item.price * item.count).toFixed(2)}}</p>
+          <p>￥{{ (Number(item.price) * Number(item.count)).toFixed(2) || '0.00' }}</p>
         </div>
       </div>
       <div class="foot">
@@ -56,7 +68,7 @@
     </div>
     <div
     class="none"
-    v-if="filteredOrder.length == 0"
+    v-else
     >
       <p>无相应订单！</p>
     </div>
@@ -68,7 +80,9 @@ import { onMounted,ref,computed } from 'vue'
 import { useRoute } from 'vue-router'
 import request from '@/utils/request'
 import router from '@/router'
+import { showToast  } from 'vant'
 
+const loading = ref(true)
 const route = useRoute()
 const orderList = ref([])
 // 获取订单列表
@@ -78,16 +92,21 @@ const getOrderList = async ()=>{
     console.log('订单',res)
     orderList.value = res
   }catch(error){
-    alert('获取订单列表失败!')
+    showToast('获取订单列表失败!')
     console.error('获取订单列表失败:', error)
+  }finally {
+    loading.value = false // 不管成功失败，都结束加载状态
   }
 }
 // 订单筛选
+
 const activeKey = computed(() => route.params.status || 'all')
 const filteredOrder = computed(()=>{
+  // 高亮筛选对应的订单
   if(activeKey.value !== 'all'){
     return orderList.value.filter(item => item.status === activeKey.value)
   }
+  // 搜索筛选
   if(route.params.words && orderList.value){
     return orderList.value.filter(item => item.desc.toLowerCase().includes(route.params.words.toLowerCase()) || item.order_item.toLowerCase().includes(route.params.words.toLowerCase()))
   }
@@ -102,9 +121,28 @@ const goMap = (id,status) => {
 onMounted(()=>{
   getOrderList()
 })
+
 </script>
 
 <style lang="less" scoped>
+.skeleton-item {
+  height: 1.6rem; // 改成接近你真实卡片的高度
+  margin-bottom: 0.05rem;
+  border-radius: 0.1rem;
+  // 加上我之前说的流动光效，视觉效果更明显
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+// 闪光动画关键帧
+@keyframes shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
 .order-list{
   margin: 0.05rem;
   .order{
